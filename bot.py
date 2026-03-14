@@ -20,7 +20,7 @@ def run_flask():
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "👋 **MLBB Checker (Fixed) မှ ကြိုဆိုပါတယ်!**\n\nစစ်ရန်: `/check [ID] [Server]`\nဥပမာ: `/check 1609968597 16765`", parse_mode="Markdown")
+    bot.reply_to(message, "👋 **MLBB Checker (Final Fix) မှ ကြိုဆိုပါတယ်!**\n\nစစ်ရန်: `/check [ID] [Server]`", parse_mode="Markdown")
 
 @bot.message_handler(commands=['check'])
 def handle_check(message):
@@ -33,20 +33,31 @@ def handle_check(message):
         status_msg = bot.reply_to(message, "🔍 စစ်ဆေးနေပါသည်...")
         full_url = f"{API_URL}/{args[1]}/{args[2]}"
         
-        # API က block မလုပ်အောင် Browser ပုံစံဖမ်းခြင်း
+        # API ကို ကျော်ဖြတ်ရန် အရေးကြီးသော Header များ
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Origin': 'https://htunhlaaung.github.io',
+            'Referer': 'https://htunhlaaung.github.io/'
         }
         
-        response = requests.get(full_url, headers=headers, timeout=12)
-        data = response.json()
+        response = requests.get(full_url, headers=headers, timeout=15)
+        
+        # Render Log မှာ အဖြေကို ကြည့်နိုင်ရန် (Debug)
+        print(f"Status Code: {response.status_code}")
+
+        try:
+            data = response.json()
+        except:
+            print(f"Raw Response: {response.text}")
+            bot.edit_message_text("❌ API က အချက်အလက် ပြန်မပို့ပါ။ API Down နေခြင်း ဖြစ်နိုင်ပါသည်။", chat_id=message.chat.id, message_id=status_msg.message_id)
+            return
 
         if data.get('error') or not data.get('data'):
             bot.edit_message_text("❌ အကောင့်မတွေ့ပါ! ID နှင့် Server ပြန်စစ်ပါ။", chat_id=message.chat.id, message_id=status_msg.message_id)
             return
 
         info = data['data']
-        res = f"🎯 **MLBB Info**\n👤 IGN: `{info.get('username')}`\n🌍 Region: {info.get('region')}\n"
+        res = f"🎯 **MLBB Info**\n━━━━━━━━━━━━━━\n👤 IGN: `{info.get('username')}`\n🌍 Region: {info.get('region')}\n🆔 ID: `{args[1]} ({args[2]})`\n"
         
         if info.get('shop_events'):
             res += "\n💎 **2x Status:**\n"
@@ -58,7 +69,7 @@ def handle_check(message):
         bot.edit_message_text(res, chat_id=message.chat.id, message_id=status_msg.message_id, parse_mode="Markdown")
         
     except Exception as e:
-        print(f"Error: {e}") # Render Log ထဲမှာ error ကြည့်ရန်
+        print(f"Error: {str(e)}")
         bot.send_message(message.chat.id, "🚫 **API မှ တုံ့ပြန်မှု မရှိပါ။** ခဏနေမှ ပြန်စမ်းကြည့်ပါ သို့မဟုတ် ID/Server မှားနေနိုင်ပါသည်။")
 
 if __name__ == '__main__':
