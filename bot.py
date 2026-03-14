@@ -4,24 +4,25 @@ from flask import Flask
 import threading
 import os
 
-# 🔑 မင်းရဲ့ Bot Token
 TOKEN = '8680632843:AAFIrkABpdfWTH9TwbrJeugUxM1eCWuhDiI'
 bot = telebot.TeleBot(TOKEN)
-
-# 🌐 API Link
 API_URL = 'https://magic-mall-mlbb-id-check-v1.hlaaunghtun68.workers.dev/mobile-legends'
 
-# Flask Web Server (၂၄ နာရီ မအိပ်အောင် လုပ်ပေးမည့်အပိုင်း)
+# Flask Web Server အိပ်မသွားအောင် Port ဖွင့်ပေးထားခြင်း
 app = Flask(__name__)
+
 @app.route('/')
-def home(): return "Bot is Live!"
+def home():
+    return "Bot is running!"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    # Render အတွက် Port ကို အလိုအလျောက်ယူပါမည်
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "👋 **MLBB Checker မှ ကြိုဆိုပါတယ်!**\n\nစစ်ရန်: `/check [ID] [Server]`", parse_mode="Markdown")
+    bot.reply_to(message, "👋 **MLBB Checker (Render) မှ ကြိုဆိုပါတယ်!**\n\nစစ်ရန်: `/check [ID] [Server]`", parse_mode="Markdown")
 
 @bot.message_handler(commands=['check'])
 def handle_check(message):
@@ -55,6 +56,7 @@ def handle_check(message):
 
 if __name__ == '__main__':
     # Flask ကို Background မှာ ပတ်မည်
-    threading.Thread(target=run_flask).start()
-    print("🚀 Bot is running...")
+    t = threading.Thread(target=run_flask)
+    t.start()
+    print("🚀 Bot is running on Render...")
     bot.infinity_polling()
