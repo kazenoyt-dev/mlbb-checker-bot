@@ -3,11 +3,20 @@ import requests
 from flask import Flask
 import threading
 import os
+import re
 from telebot import types
 
 TOKEN = '7955125092:AAEWZFwKGwCCBaoMXl_t4wChYlhSnRE6lEg'
 bot = telebot.TeleBot(TOKEN)
 API_URL = 'https://magic-mall-mlbb-id-check-v1.hlaaunghtun68.workers.dev/mobile-legends'
+
+# 🌍 နိုင်ငံအလိုက် အလံများ သတ်မှတ်ပေးခြင်း
+REGION_MAP = {
+    "MM": "Myanmar 🇲🇲", "TH": "Thailand 🇹🇭", "ID": "Indonesia 🇮🇩",
+    "SG": "Singapore 🇸🇬", "PH": "Philippines 🇵🇭", "KH": "Cambodia 🇰🇭",
+    "MY": "Malaysia 🇲🇾", "VN": "Vietnam 🇻🇳", "BR": "Brazil 🇧🇷",
+    "US": "United States 🇺🇸", "RU": "Russia 🇷🇺", "TR": "Turkey 🇹🇷"
+}
 
 app = Flask(__name__)
 
@@ -34,24 +43,36 @@ def fetch_mlbb_data(game_id, server_id):
 # --- Command Handler ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "👋 **MLBB Checker Inline Mode ရပါပြီ!**\n\nဘယ်နေရာမှာမဆို `@BotUsername ID Server` လို့ ရိုက်ပြီး စစ်နိုင်ပါပြီ။", parse_mode="Markdown")
+    bot.reply_to(message, "👋 **MLBB Checker မှ ကြိုဆိုပါတယ်!**\n\nစစ်ရန်: `/check 178178059(2911)` လို့ ရိုက်စစ်နိုင်ပါပြီ။", parse_mode="Markdown")
 
 @bot.message_handler(commands=['check'])
 def handle_check(message):
-    args = message.text.split()
-    if len(args) < 3:
-        bot.reply_to(message, "⚠️ ပုံစံ: `/check 1609968597 16765`")
+    # စာကြောင်းထဲမှ ဂဏန်းများကိုသာ သီးသန့်ရွေးထုတ်ခြင်း
+    numbers = re.findall(r'\d+', message.text)
+    
+    # ဂဏန်း ၂ ခု မပြည့်လျှင်
+    if len(numbers) < 2:
+        bot.reply_to(message, "⚠️ ပုံစံမှားနေပါသည်။\nဥပမာ: `/check 1609968597(16765)` သို့မဟုတ် `/check 1609968597 16765`", parse_mode="Markdown")
         return
     
+    game_id = numbers[0]
+    server_id = numbers[1]
+    
     status_msg = bot.reply_to(message, "🔍 စစ်ဆေးနေပါသည်...")
-    data = fetch_mlbb_data(args[1], args[2])
+    data = fetch_mlbb_data(game_id, server_id)
     
     if not data or data.get('error') or not data.get('data'):
-        bot.edit_message_text("❌ အကောင့်မတွေ့ပါ!", chat_id=message.chat.id, message_id=status_msg.message_id)
+        bot.edit_message_text("❌ အကောင့်မတွေ့ပါ! ID နှင့် Server ပြန်စစ်ပါ။", chat_id=message.chat.id, message_id=status_msg.message_id)
         return
 
     info = data['data']
-    res = f"🎯 **MLBB Info**\n👤 IGN: `{info.get('username')}`\n🌍 Region: {info.get('region')}\n"
+    
+    # နိုင်ငံကုဒ်ကို အလံနှင့် ပြောင်းလဲခြင်း
+    region_code = info.get('region', 'Unknown').upper()
+    region_display = REGION_MAP.get(region_code, f"{region_code} 🌍")
+
+    res = f"🦁 **MLBB Info**\n━━━━━━━━━━━━━━\n👤 IGN: `{info.get('username')}`\n🌍 Region: {region_display}\n🆔 ID: `{game_id} ({server_id})`\n"
+    
     if info.get('shop_events'):
         res += "\n💎 **2x Status:**\n"
         for event in info['shop_events']:
@@ -61,18 +82,25 @@ def handle_check(message):
     
     bot.edit_message_text(res, chat_id=message.chat.id, message_id=status_msg.message_id, parse_mode="Markdown")
 
-# --- Inline Query Handler (Mention ခေါ်ပြီး စစ်သည့်အပိုင်း) ---
-@bot.inline_handler(lambda query: len(query.query.split()) == 2)
+# --- Inline Query Handler ---
+# ဂဏန်း ၂ ခုပါမှသာ အလုပ်လုပ်မည်
+@bot.inline_handler(lambda query: len(re.findall(r'\d+', query.query)) >= 2)
 def query_text(inline_query):
     try:
-        game_id, server_id = inline_query.query.split()
+        numbers = re.findall(r'\d+', inline_query.query)
+        game_id = numbers[0]
+        server_id = numbers[1]
+        
         data = fetch_mlbb_data(game_id, server_id)
         
         if not data or data.get('error') or not data.get('data'):
             return
 
         info = data['data']
-        res = f"🎯 **MLBB Account Info**\n👤 IGN: `{info.get('username')}`\n🆔 ID: `{game_id} ({server_id})`\n🌍 Region: {info.get('region')}\n"
+        region_code = info.get('region', 'Unknown').upper()
+        region_display = REGION_MAP.get(region_code, f"{region_code} 🌍")
+
+        res = f"🎯 **MLBB Account Info**\n👤 IGN: `{info.get('username')}`\n🆔 ID: `{game_id} ({server_id})`\n🌍 Region: {region_display}\n"
         
         if info.get('shop_events'):
             res += "\n💎 **2x Status:**\n"
@@ -81,7 +109,6 @@ def query_text(inline_query):
                     status = "🔴 မရတော့ပါ" if item.get('reached_limit') else "🟢 ရနိုင်ပါသေးသည်"
                     res += f"• {item.get('title')} — {status}\n"
 
-        # Result ကို ကတ်ပြားပုံစံ ပြသခြင်း
         r = types.InlineQueryResultArticle(
             '1',
             f"စစ်ဆေးပြီးပြီ: {info.get('username')}",
